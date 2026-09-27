@@ -1,0 +1,2 @@
+export function notFound(req,res,next){res.status(404).json({error:'Route not found',path:req.originalUrl});}
+export function errors(err,req,res,next){console.error(err);const status=err.status|| (err.name==='ValidationError'||err.name==='CastError'?400:err.code===11000?409:500);res.status(status).json({error:status===500?'Unexpected server error':err.message,details:err.errors?Object.values(err.errors).map(e=>e.message):undefined});}
