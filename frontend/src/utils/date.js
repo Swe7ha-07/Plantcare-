@@ -1,1 +1,0 @@
-export const fmt=d=>d?new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date(d)):'Not recorded';export const shortDate=d=>d?new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short'}).format(new Date(d)):'';

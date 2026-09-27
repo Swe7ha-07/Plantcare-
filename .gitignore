@@ -3,3 +3,9 @@ node_modules
 .DS_Store
 dist
 backend/.env
+.venv/
+__pycache__/
+*.py[cod]
+.streamlit/secrets.toml
+
+.streamlit-config/
