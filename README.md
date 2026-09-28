@@ -4,7 +4,7 @@ A botanical journal for Indian home gardens. PlantCare records plant identity, c
 
 ## Features
 
-- Plant CRUD, search, type, environment, sunlight and care-state filters, sorting.
+- Plant CRUD, search, type, environment, sunlight and care-state filters, sorting; catalogue entries include one-click removal with care-history cascade.
 - Watering, fertilizer, health and growth records with timeline and date filters.
 - Dashboard statistics, care reminders, recent activity and growth charts.
 - Shared backend care-status calculation: `CARE OK`, `CARE SOON`, `CARE DUE`, or `OVERDUE`.

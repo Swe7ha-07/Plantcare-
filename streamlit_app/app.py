@@ -185,7 +185,13 @@ def collection():
                 st.caption(p.get("scientificName") or p.get("plantType","Plant"))
                 st.write(f"**{p.get('care',{}).get('status','CARE OK')}** · {p.get('location','')}")
                 st.caption(f"{p.get('sunlightRequirement','')} · Water every {p.get('wateringFrequency','?')} days")
-                st.button("Open botanical record →",key=f"open_{p['_id']}",use_container_width=True,on_click=go_to_record,args=(p["_id"],))
+                open_col, remove_col = st.columns([3,1])
+                open_col.button("Open record →",key=f"open_{p['_id']}",use_container_width=True,on_click=go_to_record,args=(p["_id"],))
+                if remove_col.button("Remove",key=f"remove_{p['_id']}",help="Delete this plant and all of its care history in one click"):
+                    deleted=request("DELETE",f"plants/{p['_id']}")
+                    if deleted is not None:
+                        st.session_state["plantcare_flash"]=(f"{p['name']} and its care history were removed.","🗑️")
+                        st.rerun()
 
 
 def detail_page(plant_id):
