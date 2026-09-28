@@ -57,7 +57,7 @@ Plant listing accepts `search`, `type`, `environment`, `sunlight`, `status`, and
 
 ## Streamlit to Express communication
 
-The Streamlit app uses Python Requests with `PLANTCARE_API_URL` (default `http://localhost:4000/api`). All persistence uses Express REST calls. MongoDB credentials stay in the backend environment. Streamlit session state stores only the selected page/plant, not persistent application records.
+The Streamlit app uses Python Requests with `PLANTCARE_API_URL` (default `http://localhost:4000/api`). All persistence uses Express REST calls. Submitting the Add a plant form sends `POST /api/plants`; a successful response triggers a toast and opens the saved plant record. If the API call fails, the app shows the API error and does not display a false success notification. MongoDB credentials stay in the backend environment. Streamlit session state stores only the selected page/plant, not persistent application records. The UI uses short CSS transitions and entrance motion, with reduced-motion preferences respected.
 
 ## Setup and run
 

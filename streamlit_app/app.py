@@ -21,7 +21,16 @@ h1,h2,h3{font-family:'DM Serif Display',serif!important;font-weight:400!importan
 [data-testid="stMetricLabel"]{font-size:.69rem!important;letter-spacing:.12em;text-transform:uppercase;color:#737b69!important}[data-testid="stMetricValue"]{font-family:'DM Serif Display',serif;color:var(--green)}
 .stButton>button,.stFormSubmitButton>button{border-radius:0;border:1px solid var(--green);background:var(--green);color:#f5f2e8;padding:.55rem 1rem;font-size:.8rem;transition:all .2s}.stButton>button:hover,.stFormSubmitButton>button:hover{background:#26382b;color:white;border-color:#26382b;transform:translateY(-1px)}
 .stTextInput input,.stTextArea textarea,.stNumberInput input,.stDateInput input,.stSelectbox div[data-baseweb="select"]>div{border-radius:0;background:#f8f6ef;border-color:#c9c7bb}
-hr{border-color:var(--line)}[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important;border-radius:0!important}
+hr{border-color:var(--line)}[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important;border-radius:0!important;transition:border-color .24s ease,background-color .24s ease,transform .24s ease}
+[data-testid="stVerticalBlockBorderWrapper"]:hover{border-color:#9ba58f!important;background-color:#f7f5ed;transform:translateY(-2px)}
+h1{animation:fieldTitle .55s cubic-bezier(.2,.7,.2,1) both}
+[data-testid="stMetric"]{animation:metricSettle .5s cubic-bezier(.2,.7,.2,1) both}
+[data-testid="stMetric"]:nth-child(2){animation-delay:.05s}[data-testid="stMetric"]:nth-child(3){animation-delay:.1s}[data-testid="stMetric"]:nth-child(4){animation-delay:.15s}
+[data-testid="stToast"]{border-left:3px solid var(--sage);border-radius:0!important;box-shadow:0 8px 28px #252c2518}
+.stButton>button:active,.stFormSubmitButton>button:active{transform:translateY(1px)}
+@keyframes fieldTitle{from{opacity:0;transform:translateY(7px);clip-path:inset(0 0 18% 0)}to{opacity:1;transform:none;clip-path:inset(0)}}
+@keyframes metricSettle{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){h1,[data-testid="stMetric"]{animation:none!important}}
 .small-note{font-size:.78rem;color:var(--muted)}.specimen{padding:1rem 1.2rem;border-left:2px solid var(--sage);background:#eeece2;margin:.5rem 0 1rem}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -98,8 +107,9 @@ def identity_form(plant=None, key="plant"):
         payload = {"name":name.strip(),"scientificName":scientific.strip(),"plantType":plant_type,"location":location.strip(),"indoorOutdoor":env,"sunlightRequirement":sunlight,"wateringFrequency":interval,"dateAdded":added.isoformat(),"image":image.strip(),"notes":notes.strip()}
         result = request("PUT" if plant else "POST", f"plants/{plant['_id']}" if plant else "plants", payload=payload)
         if result:
-            st.success("Plant record saved.")
-            st.session_state.pop("plantcare_detail_id", None)
+            st.session_state["plantcare_detail_id"] = result.get("_id", plant.get("_id") if plant else None)
+            st.session_state["plantcare_pending_nav"] = "Plant record"
+            st.session_state["plantcare_flash"] = (f"{payload['name']} was added to your garden and saved to MongoDB." if not plant else f"{payload['name']}’s record was updated.", "🌱")
             st.rerun()
     return submitted
 
@@ -271,6 +281,11 @@ with st.sidebar:
     st.markdown("# 🌱 PlantCare")
     st.caption("A living garden journal")
     st.markdown("FIELD NOTES · № 01 / 2026")
+    if "plantcare_pending_nav" in st.session_state:
+        st.session_state["plantcare_nav"] = st.session_state.pop("plantcare_pending_nav")
+    if "plantcare_flash" in st.session_state:
+        message, icon = st.session_state.pop("plantcare_flash")
+        st.toast(message, icon=icon)
     nav=st.radio("Your garden",["Overview","My plants","Add a plant","Care history","Plant record"],key="plantcare_nav",label_visibility="visible")
     st.divider();st.markdown("✳ **GROWING SEASON**  \nMonsoon · 2026  \nSouth India")
 
