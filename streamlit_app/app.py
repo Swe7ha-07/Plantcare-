@@ -1,40 +1,18 @@
 import os
 from datetime import date, timedelta
+from html import escape
 from urllib.parse import urljoin
 
+import altair as alt
+import pandas as pd
 import requests
 import streamlit as st
 
+from styles import CSS
+
 API_BASE = os.getenv("PLANTCARE_API_URL", "http://localhost:4000/api").rstrip("/") + "/"
 st.set_page_config(page_title="PlantCare · Garden journal", page_icon="🌿", layout="wide", initial_sidebar_state="expanded")
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap');
-:root{--paper:#f4f1e8;--ink:#252c25;--green:#354c3b;--sage:#819079;--line:#d9d5c9;--clay:#aa6850;--muted:#79796d}
-html,body,[class*="css"]{font-family:'Manrope',sans-serif;color:var(--ink)}.stApp{background:var(--paper)}
-[data-testid="stSidebar"]{background:#eeece2;border-right:1px solid var(--line)}
-[data-testid="stSidebar"] h1{font-family:'DM Serif Display',serif;font-weight:400;color:var(--green)}
-h1,h2,h3{font-family:'DM Serif Display',serif!important;font-weight:400!important;color:var(--ink)}h1{font-size:3.2rem!important;line-height:1.05!important}h2{font-size:2rem!important}h3{font-size:1.45rem!important}
-.eyebrow{letter-spacing:.16em;text-transform:uppercase;color:#737b69;font-size:.68rem;font-weight:700}
-[data-testid="stMetric"]{background:#e8e7db;border:1px solid #d4d2c5;padding:1rem 1.2rem;min-height:125px}
-[data-testid="stMetricLabel"]{font-size:.69rem!important;letter-spacing:.12em;text-transform:uppercase;color:#737b69!important}[data-testid="stMetricValue"]{font-family:'DM Serif Display',serif;color:var(--green)}
-.stButton>button,.stFormSubmitButton>button{border-radius:0;border:1px solid var(--green);background:var(--green);color:#f5f2e8;padding:.55rem 1rem;font-size:.8rem;transition:all .2s}.stButton>button:hover,.stFormSubmitButton>button:hover{background:#26382b;color:white;border-color:#26382b;transform:translateY(-1px)}
-.stTextInput input,.stTextArea textarea,.stNumberInput input,.stDateInput input,.stSelectbox div[data-baseweb="select"]>div{border-radius:0;background:#f8f6ef;border-color:#c9c7bb}
-hr{border-color:var(--line)}[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important;border-radius:0!important;transition:border-color .24s ease,background-color .24s ease,transform .24s ease}
-[data-testid="stVerticalBlockBorderWrapper"]:hover{border-color:#9ba58f!important;background-color:#f7f5ed;transform:translateY(-2px)}
-h1{animation:fieldTitle .55s cubic-bezier(.2,.7,.2,1) both}
-[data-testid="stMetric"]{animation:metricSettle .5s cubic-bezier(.2,.7,.2,1) both}
-[data-testid="stMetric"]:nth-child(2){animation-delay:.05s}[data-testid="stMetric"]:nth-child(3){animation-delay:.1s}[data-testid="stMetric"]:nth-child(4){animation-delay:.15s}
-[data-testid="stToast"]{border-left:3px solid var(--sage);border-radius:0!important;box-shadow:0 8px 28px #252c2518}
-.stButton>button:active,.stFormSubmitButton>button:active{transform:translateY(1px)}
-@keyframes fieldTitle{from{opacity:0;transform:translateY(7px);clip-path:inset(0 0 18% 0)}to{opacity:1;transform:none;clip-path:inset(0)}}
-@keyframes metricSettle{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){h1,[data-testid="stMetric"]{animation:none!important}}
-.small-note{font-size:.78rem;color:var(--muted)}.specimen{padding:1rem 1.2rem;border-left:2px solid var(--sage);background:#eeece2;margin:.5rem 0 1rem}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(CSS, unsafe_allow_html=True)
 
 
 def request(method, path, *, params=None, payload=None):
@@ -70,11 +48,34 @@ def status_label(value):
     return (value or "CARE OK").upper()
 
 
+def status_class(value):
+    return {"OVERDUE":"late", "CARE DUE":"due", "CARE SOON":"soon", "CARE OK":"ok"}.get(status_label(value), "none")
+
+
 def page_header(kicker, title, subtitle=None):
-    st.markdown(f'<div class="eyebrow">{kicker}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="eyebrow">{escape(str(kicker))}</div>', unsafe_allow_html=True)
     st.title(title)
     if subtitle:
-        st.caption(subtitle)
+        st.markdown(f'<p class="pc-sub">{escape(str(subtitle))}</p>', unsafe_allow_html=True)
+
+
+def growth_chart(records, chart_height=260):
+    points = [{"date":row.get("date"), "height":row.get("height"), "leaves":row.get("leafCount"), "plant":row.get("plant", "This plant")}
+              for row in records if row.get("height") is not None and row.get("date")]
+    if not points:
+        st.caption("Growth notes will take root here.")
+        return
+    frame = pd.DataFrame(points)
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame = frame.dropna(subset=["date", "height"])
+    line = alt.Chart(frame).encode(
+        x=alt.X("date:T", title=None, axis=alt.Axis(format="%d %b", labelColor="#718075", tickColor="#DCD8CA", domain=False)),
+        y=alt.Y("height:Q", title="Height (cm)", axis=alt.Axis(labelColor="#718075", gridColor="#E3E0D5", domain=False)),
+        color=alt.Color("plant:N", title=None, scale=alt.Scale(range=["#3D6B4F", "#47758A", "#B7862B", "#A55E49", "#718B5A"])),
+        tooltip=[alt.Tooltip("plant:N", title="Plant"), alt.Tooltip("date:T", title="Date", format="%d %b %Y"), alt.Tooltip("height:Q", title="Height (cm)"), alt.Tooltip("leaves:Q", title="Leaves")]
+    )
+    chart=(line.mark_line(strokeWidth=2.5, interpolate="monotone") + line.mark_circle(size=56, stroke="white", strokeWidth=1.5)).properties(height=chart_height).configure_view(strokeWidth=0).configure(background="transparent")
+    st.altair_chart(chart, use_container_width=True)
 
 
 def identity_form(plant=None, key="plant"):
@@ -139,23 +140,25 @@ def dashboard():
                 label="Water overdue" if care.get("status")=="OVERDUE" else "Water today" if care.get("status")=="CARE DUE" else "Care soon"
                 if care.get("nextFertilizer") and str(care["nextFertilizer"])[:10] <= (date.today()+timedelta(days=4)).isoformat(): label="Fertilizer due soon"
                 with st.container(border=True):
-                    a,b,c=st.columns([2,2,1]); a.markdown(f"**{p['name']}**  \n{p.get('location','')}");b.write(label);c.caption(care.get("status","CARE OK"))
+                    a,b,c=st.columns([2,2,1]); a.markdown(f"**{escape(str(p['name']))}**  \n{escape(str(p.get('location','')))}");b.write(label);c.markdown(f'<span class="tag {status_class(care.get("status"))}">{escape(status_label(care.get("status")))}</span>',unsafe_allow_html=True)
         else: st.info("A quiet day in the garden. Everything is tended.")
     with right:
         st.markdown('<div class="eyebrow">OVER THE PAST WEEKS</div>',unsafe_allow_html=True)
         st.subheader("Growth, recorded")
         growth=data.get("growthSnapshot",[])
         if growth:
-            st.line_chart({"Height (cm)": [row.get("height") for row in growth if row.get("height") is not None]},height=240)
+            growth_chart(growth, chart_height=240)
             st.caption("HEIGHT IN CM · FIELD MEASUREMENTS")
         else: st.caption("Growth notes will take root here.")
     st.divider()
     st.markdown('<div class="eyebrow">FROM THE NOTEBOOK</div>',unsafe_allow_html=True);st.subheader("Recent activity")
     activity=data.get("activity",[])
     if activity:
-        for row in activity[:8]:
-            st.markdown(f"**{row.get('plant','Plant')}** · {row.get('summary','Care note')}  \n<span class='small-note'>{fmt(row.get('date'))} · {row.get('type','').title()}</span>",unsafe_allow_html=True)
-            st.markdown("---")
+        for index,row in enumerate(activity[:8]):
+            plant_name=escape(str(row.get("plant","Plant")))
+            summary=escape(str(row.get("summary","Care note")))
+            kind=escape(str(row.get("type","")).title())
+            st.markdown(f'<div class="pc-entry" style="--delay:{index*45}ms"><b>{plant_name}</b> · {summary}<small>{fmt(row.get("date"))} · {kind}</small></div>',unsafe_allow_html=True)
     else: st.caption("Your garden's story starts with the first note.")
 
 
@@ -180,10 +183,11 @@ def collection():
                 if p.get("image"):
                     st.image(p["image"],use_container_width=True)
                 else:
-                    st.markdown(f"<div class='specimen'><span class='eyebrow'>SPECIMEN · {i+1:02d}</span><h3>{p['name']}</h3><i>{p.get('scientificName','')}</i><br/><span class='small-note'>{p.get('location','')}</span></div>",unsafe_allow_html=True)
-                st.markdown(f"### {p['name']}")
+                    st.markdown(f"<div class='specimen'><span class='eyebrow'>SPECIMEN · {i+1:02d}</span><h3>{escape(str(p['name']))}</h3><i>{escape(str(p.get('scientificName','')))}</i><br/><span class='small-note'>{escape(str(p.get('location','')))}</span></div>",unsafe_allow_html=True)
+                st.markdown(f"### {escape(str(p['name']))}")
                 st.caption(p.get("scientificName") or p.get("plantType","Plant"))
-                st.write(f"**{p.get('care',{}).get('status','CARE OK')}** · {p.get('location','')}")
+                care_status=p.get("care",{}).get("status","CARE OK")
+                st.markdown(f'<span class="tag {status_class(care_status)}">{escape(status_label(care_status))}</span> &nbsp; {escape(str(p.get("location","")))}',unsafe_allow_html=True)
                 st.caption(f"{p.get('sunlightRequirement','')} · Water every {p.get('wateringFrequency','?')} days")
                 open_col, remove_col = st.columns([3,1])
                 open_col.button("Open record →",key=f"open_{p['_id']}",use_container_width=True,on_click=go_to_record,args=(p["_id"],))
@@ -248,7 +252,7 @@ def detail_page(plant_id):
         else:st.info("The first care note is waiting to be written.")
     with t2:
         growth=detail.get("growth",[])
-        if growth:st.line_chart({"Height (cm)": [x.get("height") for x in growth], "Leaf count": [x.get("leafCount") for x in growth]},height=280)
+        if growth:growth_chart([{**x,"plant":p["name"]} for x in growth],chart_height=280)
         else:st.info("Add growth notes to see this plant’s progress.")
     with t3:
         records=detail.get("health",[])
@@ -284,9 +288,7 @@ def history_page():
 
 
 with st.sidebar:
-    st.markdown("# 🌱 PlantCare")
-    st.caption("A living garden journal")
-    st.markdown("FIELD NOTES · № 01 / 2026")
+    st.markdown('<div class="pc-brand">PlantCare</div><div class="pc-brand-sub">A living garden journal</div><div class="pc-edition">FIELD NOTES · № 01 / 2026</div>',unsafe_allow_html=True)
     if "plantcare_pending_nav" in st.session_state:
         st.session_state["plantcare_nav"] = st.session_state.pop("plantcare_pending_nav")
     if "plantcare_flash" in st.session_state:
